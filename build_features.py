@@ -8,9 +8,7 @@ import time
 """
 
 try:  # for local run
-    os.chdir("/Users/melaniebernhardt/Documents/brain_project/")
-    cwd = os.getcwd()
-    data_folder = cwd + '/DATA/'
+    data_folder = "../../data/Data-10thMay/"
 except:   # for cluster
     cwd = os.getcwd()
     data_folder = "/cluster/scratch/melanibe/"+'/DATA/'
@@ -45,27 +43,30 @@ def prepare_X(subject_list=subject_list):
     for subj in os.listdir(data_folder):
         path_subj = os.path.join(data_folder, subj)
         if subj in subject_list:
-            print(subj)
+            print(f"Loading subject {subj}...")
             if os.path.isdir(path_subj):
                 for phase in os.listdir(path_subj):
                     path_phase = os.path.join(path_subj, phase)
                     if os.path.isdir(path_phase):
                         for file in os.listdir(path_phase):
+                            if re.search(r'average', file) is not None:
+                                continue
                             path_file = os.path.join(path_phase, file)
-                            test = re.search(r'average', file)
-                            if test is None:
-                                X.append(np.reshape(
-                                    np.asarray(sio.loadmat(path_file)['TF']),
-                                              (4095, 50)))
-                                Y.append(phases[phase])
+                            """
+                            Other potentially interesting keys in the Matlab files:
+                            RowNames: names of the 90 regions in the atlas;
+                            Freqs: frequencies in Hz for each input matrix;
+                            """
+                            X.append(np.reshape(
+                                np.asarray(sio.loadmat(path_file)['TF']),
+                                          (4095, 50)))
+                            Y.append(phases[phase])
                             i += 1
     t2 = time.time()
     X = np.asarray(X)
     Y = np.asarray(Y)
-    print(np.shape(X))
-    print(np.shape(Y))
-    print(t2 - t1)
-    return(X, Y)
+    print(f"Loaded {i} observations of shape {X.shape} in {t2 - t1:.2f}s.")
+    return (X, Y)
 
 
 def transform_X_std(X):
@@ -80,12 +81,11 @@ def transform_X_std(X):
     Returns:
         X_aggregated: aggregated matrix [nobs, 4095*5]
     """
-    X_delta = np.mean(X[:, :, 0:4], axis=2)  # 1 to <4 Hz
-    print(np.shape(X_delta))
-    X_theta = np.mean(X[:, :, 4:8], axis=2)   # 4 to <8 Hz
-    X_alpha = np.mean(X[:, :, 8:13], axis=2)  # 8-<13 Hz
-    X_beta = np.mean(X[:, :, 13:30], axis=2)  # 13-<30 Hz
-    X_gamma = np.mean(X[:, :, 30:], axis=2)  # >=30 Hz
+    X_delta = np.mean(X[:, :, 0:4],   axis=2)  # 1 to <4 Hz
+    X_theta = np.mean(X[:, :, 4:8],   axis=2)  # 4 to <8 Hz
+    X_alpha = np.mean(X[:, :, 8:13],  axis=2)  # 8 - <13 Hz
+    X_beta  = np.mean(X[:, :, 13:30], axis=2)  # 13 - <30 Hz
+    X_gamma = np.mean(X[:, :, 30:],   axis=2)  # >=30 Hz
     X_aggregated = np.concatenate(
         (X_delta, X_theta, X_alpha, X_beta, X_gamma),
         axis=1)
